@@ -72,7 +72,13 @@ def create_schema(conn: sqlite3.Connection) -> None:
     )
 
 
-def expand(graph_path: str | Path, doc_ids: list[str], *, max_hops: int = 1) -> list[dict]:
+def _record(statements: list | None, statement: str, params: list) -> None:
+    if statements is not None:
+        statements.append({"statement": " ".join(statement.split()), "params": list(params)})
+
+
+def expand(graph_path: str | Path, doc_ids: list[str], *, max_hops: int = 1,
+           statements: list | None = None) -> list[dict]:
     """Every document that shares an entity with a seed.
 
     `similarity` is the sum of 1/df over shared entities. `max_hops` below 1
@@ -84,9 +90,7 @@ def expand(graph_path: str | Path, doc_ids: list[str], *, max_hops: int = 1) -> 
     conn = connect(graph_path)
     try:
         marks = ",".join("?" * len(doc_ids))
-        try:
-            rows = conn.execute(
-                f"""
+        statement = f"""
                 WITH seed_entities AS (
                     SELECT DISTINCT entity_id FROM document_entities WHERE doc_id IN ({marks})
                 ),
@@ -102,9 +106,11 @@ def expand(graph_path: str | Path, doc_ids: list[str], *, max_hops: int = 1) -> 
                 WHERE n.doc_id NOT IN ({marks})
                 GROUP BY n.doc_id
                 ORDER BY similarity DESC, shared_count DESC, n.doc_id
-                """,
-                [*doc_ids, *doc_ids],
-            ).fetchall()
+                """
+        params = [*doc_ids, *doc_ids]
+        _record(statements, statement, params)
+        try:
+            rows = conn.execute(statement, params).fetchall()
         except sqlite3.OperationalError:
             rows = []
     finally:
@@ -115,7 +121,8 @@ def expand(graph_path: str | Path, doc_ids: list[str], *, max_hops: int = 1) -> 
     ]
 
 
-def describe(graph_path: str | Path, seeds: list[str], hits: list[dict]) -> list[dict]:
+def describe(graph_path: str | Path, seeds: list[str], hits: list[dict],
+             statements: list | None = None) -> list[dict]:
     """Title and the rarest shared entity. The chosen hits stay in order."""
     for hit in hits:
         hit.setdefault("title", "")
@@ -131,19 +138,16 @@ def describe(graph_path: str | Path, seeds: list[str], hits: list[dict]) -> list
         hit_ids = [hit["doc_id"] for hit in hits]
         hit_marks = ",".join("?" * len(hit_ids))
         seed_marks = ",".join("?" * len(seeds))
+        title_sql = f"SELECT doc_id, source FROM documents WHERE doc_id IN ({hit_marks})"
+        _record(statements, title_sql, hit_ids)
         try:
             titles = {
                 row["doc_id"]: row["source"]
-                for row in conn.execute(
-                    f"SELECT doc_id, source FROM documents WHERE doc_id IN ({hit_marks})",
-                    hit_ids,
-                )
+                for row in conn.execute(title_sql, hit_ids)
             }
         except sqlite3.OperationalError:
             titles = {}
-        try:
-            labels = conn.execute(
-                f"""
+        label_sql = f"""
                 WITH seed_entities AS (
                     SELECT DISTINCT entity_id FROM document_entities WHERE doc_id IN ({seed_marks})
                 ),
@@ -162,9 +166,11 @@ def describe(graph_path: str | Path, seeds: list[str], hits: list[dict]) -> list
                 JOIN entity_df df ON df.entity_id = n.entity_id
                 WHERE n.doc_id IN ({hit_marks})
                 ORDER BY n.doc_id, df.df ASC, ent.name
-                """,
-                [*seeds, *seeds, *hit_ids],
-            ).fetchall()
+                """
+        label_params = [*seeds, *seeds, *hit_ids]
+        _record(statements, label_sql, label_params)
+        try:
+            labels = conn.execute(label_sql, label_params).fetchall()
         except sqlite3.OperationalError:
             labels = []
     finally:
@@ -228,8 +234,8 @@ class EvidenceGraph:
         finally:
             conn.close()
 
-    def expand(self, seed_ids: list[str], *, max_hops: int = 1) -> list[dict]:
-        return expand(self.path, seed_ids, max_hops=max_hops)
+    def expand(self, seed_ids: list[str], *, max_hops: int = 1, statements: list | None = None) -> list[dict]:
+        return expand(self.path, seed_ids, max_hops=max_hops, statements=statements)
 
-    def describe(self, seeds: list[str], hits: list[dict]) -> list[dict]:
-        return describe(self.path, seeds, hits)
+    def describe(self, seeds: list[str], hits: list[dict], statements: list | None = None) -> list[dict]:
+        return describe(self.path, seeds, hits, statements=statements)

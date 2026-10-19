@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sql-evidence-graph"
-version = "0.1.0"
+version = "0.1.1"
 description = "SQL-first evidence graph on SQLite: documents, entities, relations, and one-hop expansion. Ranking is supplied by the caller."
 readme = "README.md"
 license = "MIT"

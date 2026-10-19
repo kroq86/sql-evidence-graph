@@ -13,10 +13,15 @@ class ExpandTests(unittest.TestCase):
             graph.create()
             graph.link("seed", "topic:payments", "payments", "topic", "body", "payments settle overnight")
             graph.link("neighbor", "topic:payments", "payments", "topic", "body", "settlement window")
-            found = graph.expand(["seed"])
-            described = graph.describe(["seed"], found)
+            statements = []
+            found = graph.expand(["seed"], statements=statements)
+            described = graph.describe(["seed"], found, statements=statements)
         self.assertEqual([hit["doc_id"] for hit in found], ["neighbor"])
         self.assertEqual(described[0]["entity"], "payments")
+        self.assertEqual(len(statements), 3)
+        self.assertIn("document_entities", statements[0]["statement"])
+        self.assertEqual(statements[0]["params"], ["seed", "seed"])
+        self.assertTrue(statements[1]["statement"].startswith("SELECT doc_id, source FROM documents"))
         ordered = order_by_score(
             [{"doc_id": "neighbor", "similarity": 1.0}, {"doc_id": "other", "similarity": 9.0}],
             {"other": 2.0},
