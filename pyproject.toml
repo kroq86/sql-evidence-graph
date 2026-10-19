@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sql-evidence-graph"
+version = "0.1.0"
+description = "SQL-first evidence graph on SQLite: documents, entities, relations, and one-hop expansion. Ranking is supplied by the caller."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "KirillOstapenko", email = "djkroq@gmail.com" }]
+keywords = ["sqlite", "graph", "retrieval", "evidence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/kroq86/sql-evidence-graph"
+Repository = "https://github.com/kroq86/sql-evidence-graph"
+Issues = "https://github.com/kroq86/sql-evidence-graph/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sql_evidence_graph"]
+
+[tool.hatch.build.targets.sdist]
+include = ["sql_evidence_graph/**", "tests/**", "README.md", "LICENSE"]
